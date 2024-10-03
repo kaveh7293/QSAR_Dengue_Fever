@@ -14,6 +14,11 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from streamlit_ketcher import st_ketcher
 import gzip
+import requests
+import json
+import boto3
+import io
+FLASK_APP_URL = 'http://localhost:5000/predict'  # Replace with your Flask app URL if deployed
 
 
 def smiles_to_image(smiles,id):
@@ -43,7 +48,7 @@ for i in df2.standard_value:
   else:
     bioactivity_class.append("intermediate")
 
-RDKIT_features=pd.read_pickle('RDKIT_Classification_features.pkl')
+# RDKIT_features=pd.read_pickle('RDKIT_Classification_features.pkl')
 
 st.markdown("""
     <style>
@@ -138,14 +143,29 @@ def featurize_molecule(smiles, descriptor_names=None):
     return pd.DataFrame([features])
 
 
-with open('random_forest_class.pickle', 'rb') as file:
-    random_forest_model = pickle.load(file)
+# with open('random_forest_classfle.load(file)
 
 # all_candidates=pd.read_pickle('ALL_Candidates.pkl')
 
-with gzip.open('./chembl_30_chemreps_tenth.txt.gz', "rt") as file:
-    # Assuming the file is tab-separated and has headers
-    all_candidates = pd.read_csv(file, sep='\t', usecols=['chembl_id', 'canonical_smiles','standard_inchi','standard_inchi_key'])
+
+
+s3 = boto3.client('s3', region_name='us-east-1')
+
+# Bucket and file information
+bucket_name = 'drug-discovery-files'
+file_key = 'chembl_30_chemreps_tenth.txt.gz'
+
+# Get the gzipped file from S3
+response = s3.get_object(Bucket=bucket_name, Key=file_key)
+
+# Decompress the file and read it with pandas
+with gzip.GzipFile(fileobj=io.BytesIO(response['Body'].read())) as file:
+    all_candidates = pd.read_csv(file, sep='\t', usecols=['chembl_id', 'canonical_smiles', 'standard_inchi', 'standard_inchi_key'])
+
+
+# with gzip.open('./chembl_30_chemreps_tenth.txt.gz', "rt") as file:
+#     # Assuming the file is tab-separated and has headers
+#     all_candidates = pd.read_csv(file, sep='\t', usecols=['chembl_id', 'canonical_smiles','standard_inchi','standard_inchi_key'])
 
 
 
@@ -156,10 +176,30 @@ with st.expander('Ligand/Target interaction Prediction',expanded=True):
         st.write('')
         st.write('Draw your the structure of your proposed ligand and press apply to predict if it is an active ligand:')
         smiles = st_ketcher()
-        row_to_check=featurize_molecule(smiles,descriptor_names=descriptor_names)
 
-        print(row_to_check)
-        y_output=random_forest_model.predict(row_to_check)
+        if smiles:
+        # Send a POST request to the Flask app
+            response = requests.post(FLASK_APP_URL, json={'smile_string': smiles})
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                result = response.json()
+                # st.write(f"Prediction Result: {result}")
+            else:
+                st.write("Error: Unable to get prediction.")
+        else:
+            st.write("Please enter a SMILES string.")
+
+        # row_to_check=featurize_molecule(smiles,descriptor_names=descriptor_names)
+
+        # print(row_to_check)
+        body = json.loads(result['body'])
+
+# Extract the 'prediction' value (which is a list)
+        y_output = body['prediction']
+        # st.write(f"Prediction Result: {y_output}")
+
+
         if y_output[0]==1:
             # with col1:
             #     st.write(row['chembl_id'])
@@ -167,8 +207,9 @@ with st.expander('Ligand/Target interaction Prediction',expanded=True):
             st.write('This ligand has intermediate interaction with the target protein') 
         else:           
             st.write('This ligand has no interaction with your target protein')
-    except:
+    except Exception:
         pass
+        # st.write(e)
 
 with st.expander('Drug Discovery Dashboard'):
     
@@ -181,10 +222,37 @@ with st.expander('Drug Discovery Dashboard'):
     if button_discover:
         my_grid.write('Ligand ID')
         my_grid.write('Ligand Structure')
-        for index,row in all_candidates.iloc[1:10000,:].iterrows():
+        for index,row in all_candidates.iloc[1:100,:].iterrows():
+            # st.write(index)
             try:
-                row_to_check=featurize_molecule(row['canonical_smiles'],descriptor_names=descriptor_names)
-                y_output=random_forest_model.predict(row_to_check)
+                if row['canonical_smiles']:
+                # Send a POST request to the Flask app
+                    response_iter = requests.post(FLASK_APP_URL, json={'smile_string': row['canonical_smiles']})
+
+                    # Check if the request was successful
+                    if response_iter.status_code == 200:
+                        result = response_iter.json()
+                        body = json.loads(result['body'])
+
+        # Extract the 'prediction' value (which is a list)
+                        y_output = body['prediction']
+                        # st.write(f"Prediction Result: {result}")
+                    # else:
+                    #     st.write("Error: Unable to get prediction.")
+                # else:
+                #     st.write("Please enter a SMILES string.")
+
+                # row_to_check=featurize_molecule(smiles,descriptor_names=descriptor_names)
+
+                # print(row_to_check)
+
+
+
+                
+
+
+                # row_to_check=featurize_molecule(row['canonical_smiles'],descriptor_names=descriptor_names)
+                # y_output=random_forest_model.predict(row_to_check)
                 if y_output[0]==1:
                     # with col1:
                     #     st.write(row['chembl_id'])
@@ -222,14 +290,14 @@ with st.expander('Machine Learning Model Development Steps Summary'):
             <li>In the next step a featurizer function is created based on the features available in RDKit library. This function was used to generate features based on the SMILES structure of the molecules.  In the following, you can see the resulting dataframe that will be used to train the associated models.   </li></ul>
 
         """, unsafe_allow_html=True)
-    st.write(RDKIT_features)
-    class_report_df=pd.read_pickle('class_report.pkl')
+    # st.write(RDKIT_features)
+    # class_report_df=pd.read_pickle('class_report.pkl')
     st.markdown("""
         <ul><li>After 80/20 split of training and testing datasets, the following metrics were obtained for the trained RandomForestClassifier.<br></li>
             </ul>
 
         """, unsafe_allow_html=True)
-    st.write(class_report_df)
+    # st.write(class_report_df)
     st.write("There are some important points needed to be noted. It seams that there is no Active ligands for our target. Therefore, the process of drug discovery will be limited to find intermedaited compounds. Also, since the dataset is imbalanced, we needed to make the database more balanced. I used the Synthetic Minority Oversampling Technique (SMOTE) to balance our database for the sake of finding the intermdiate ligands more accurately.")
 
     # col1,col2=st.columns((1,1))
