@@ -20,4 +20,16 @@ There are some important points needed to be noted. It seams that there is no Ac
 
 I deployed the model into the aws lambda but given the size of the python library I had to use a dockerized version of the lambda function in Amazon ECr and deploy the corresponding lambda functions using the image from ECR. This lambda function return the output to the model by only receiving the smiles structure of the drug candidates. An API has been created using flask python framework so that we can eventually use from our function in our front-end streamlit application. In the following you can see a summary of the architecture that I have used. 
 
-<img width="435" alt="image" src="https://github.com/user-attachments/assets/5c65cdfd-ca24-436a-ac6f-74b8b9a43ea8">
+<img width="420" alt="image" src="https://github.com/user-attachments/assets/cb95b98b-403b-4746-8bbe-8c9e3b4ed0c3">
+
+
+In summary, the following workflow was used for eventually deploying the model:
+
+1- Find the target protein
+2- Find the drug candidates
+3- Build a machine learning model
+4- Save the pickled model and all drug candidates on Amazon S3
+5- Dockerize the lambda function and send it to Amazon ECR
+6- Deploy the lambda function using the image on Amazon ECR
+7- Build an API using the Flask Application
+8- Deploy the streamlit application based on the APIs created and deploy it Amazon EC2
