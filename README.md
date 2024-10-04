@@ -5,12 +5,19 @@
 In summary, the following steos were followed to build a machine learning model for Dengue Fever drug discovery. This model is deployed using a streamlit app on Amazon EC2.
 
 1- Find the target protein
+
 2- Find the drug candidates
+
 3- Build a machine learning model
+
 4- Save the pickled model and all drug candidates on Amazon S3
+
 5- Dockerize the lambda function and send it to Amazon ECR
+
 6- Deploy the lambda function using the image on Amazon ECR
+
 7- Build an API using the Flask Application
+
 8- Deploy the streamlit application based on the APIs created and deploy it Amazon EC2
 
 
