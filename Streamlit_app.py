@@ -18,6 +18,7 @@ import requests
 import json
 import boto3
 import io
+import os
 FLASK_APP_URL = 'http://localhost:5000/predict'  # Replace with your Flask app URL if deployed
 
 
@@ -302,5 +303,42 @@ with st.expander('Machine Learning Model Development Steps Summary'):
 
     # col1,col2=st.columns((1,1))
 
+with st.expander('LLM Model Deployment for Summarization'):
+    st.title("API Gateway Tester for Summarization")
+    API_URL  = os.environ.get('API_URL') 
+    print(API_URL)
+    # Input text for summarization
+    input_text = st.text_area(
+        "Enter the text to summarize:",
+        placeholder="Paste your text here..."
+    )
+
+    if st.button("Summarize"):
+        if not input_text.strip():
+            st.error("Please enter some text to summarize.")
+        else:
+            # Prepare the payload
+            payload = {
+                "text": f"summarize: {input_text}"
+            }
+
+            try:
+                # Send the POST request to the API Gateway
+                response = requests.post(API_URL, json=payload, headers={"Content-Type": "application/json"})
+
+                # Check if the request was successful
+                if response.status_code == 200:
+                    # Parse and display the summarized text
+                    result = response.json()
+                    st.success("Summarization Successful!")
+                    st.write("**Generated Summary:**")
+                    st.write(result.get("generated_text", "No summary found."))
+                else:
+                    st.error(f"Error: {response.status_code}")
+                    st.write(response.text)
+                    print(response.text)
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
 
